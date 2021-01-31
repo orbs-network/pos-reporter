@@ -2,6 +2,7 @@
   "name": "orbs",
   "version": "0.1.0",
   "private": true,
+  "homepage" : "https://orbs-network.github.io/pos-reporter/",
   "dependencies": {
     "@orbs-network/pos-analytics-lib": "^0.8.1",
     "lodash": "^4.17.20",

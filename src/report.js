@@ -187,7 +187,6 @@ async function generateTypedDelegatorPaticipationRewads(guardian, delegators, is
             console.log(`Error while generating ${isHistoric ? "historical" : "" } delegator ${delegator.address}: ${e.stack} ... (skipped)`);
         }
         participantsRewards.push(generateParticipantObject(guardian, isHistoric ? 'Historical Delegator': 'Delegator', drewards, delegator.address));
-        break;
     }
 }
 
