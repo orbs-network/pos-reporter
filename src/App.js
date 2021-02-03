@@ -22,16 +22,10 @@ async function getReport(reportPeriodLength, reportNumberOfPeriods, reportShowOn
       periods: new Number(reportNumberOfPeriods).valueOf(), 
       show_only_full_periods: reportShowOnlyFull === 'true'
     };
+
     //const report = await getGuardiansPeriodsReport(guardianAddresses, includeDelegators, ethereumEndpoint, options);
     const report = await getPeriodsReport(ethereumEndpoint, nodeEndpoints, options)
-    return reportToXlsx(report, 'binary');
-}
-
-function s2ab(s) { 
-  var buf = new ArrayBuffer(s.length); //convert s to arrayBuffer
-  var view = new Uint8Array(buf);  //create uint8array as viewer
-  for (var i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF; //convert to octet
-  return buf;    
+    return reportToXlsx(report);
 }
 
 function downloadReport(report, reportFilenamePrefix) {
@@ -71,7 +65,7 @@ function App() {
     const { reportType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
     setLoading(true);
     const result = await getReport(reportType, reportPeriods, reportShowFull);
-    downloadReport(s2ab(result), reportFilenamePrefix);
+    downloadReport(result, reportFilenamePrefix);
     setLoading(false);
   };
 

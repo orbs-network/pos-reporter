@@ -110,7 +110,7 @@ async function getGuardianPeriodsReport(address, calculateDelegators, web3, repo
     const res = generateGuardianPeriodResults(gInfo, report.periods);
     participantsRewards.push(generateParticipantObject(gInfo, 'Total', res.allGuardianRewards));
     participantsRewards.push(generateParticipantObject(gInfo, 'Self-Share (guardian + self-delegate)', res.guardianSelfRewards));
-    participantsRewards.push(generateParticipantObject(gInfo, 'Delegators', res.sumDelegatorRewards));
+    participantsRewards.push(generateParticipantObject(gInfo, 'Total Delegators', res.sumDelegatorRewards));
 
     if (calculateDelegators) {
         await generateAllDelegatorPaticipationRewads(gInfo, web3, readOptions, report.periods, participantsRewards);

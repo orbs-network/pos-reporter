@@ -1,10 +1,11 @@
 {
   "name": "orbs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "homepage" : "https://orbs-network.github.io/pos-reporter/",
+  "homepage": "https://orbs-network.github.io/pos-reporter/",
   "dependencies": {
     "@orbs-network/pos-analytics-lib": "^0.8.1",
+    "exceljs": "^4.2.0",
     "lodash": "^4.17.20",
     "react": "^16.13.1",
     "react-bootstrap": "^1.2.2",
