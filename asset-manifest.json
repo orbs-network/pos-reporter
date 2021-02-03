@@ -1,8 +1,8 @@
 {
   "files": {
     "main.css": "/pos-reporter/static/css/main.cddf4649.chunk.css",
-    "main.js": "/pos-reporter/static/js/main.f96b8934.chunk.js",
-    "main.js.map": "/pos-reporter/static/js/main.f96b8934.chunk.js.map",
+    "main.js": "/pos-reporter/static/js/main.28bfacd4.chunk.js",
+    "main.js.map": "/pos-reporter/static/js/main.28bfacd4.chunk.js.map",
     "runtime-main.js": "/pos-reporter/static/js/runtime-main.f0df335e.js",
     "runtime-main.js.map": "/pos-reporter/static/js/runtime-main.f0df335e.js.map",
     "static/css/2.3953ff4e.chunk.css": "/pos-reporter/static/css/2.3953ff4e.chunk.css",
@@ -19,6 +19,6 @@
     "static/css/2.3953ff4e.chunk.css",
     "static/js/2.b82493aa.chunk.js",
     "static/css/main.cddf4649.chunk.css",
-    "static/js/main.f96b8934.chunk.js"
+    "static/js/main.28bfacd4.chunk.js"
   ]
 }
