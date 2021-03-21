@@ -127,8 +127,9 @@ function generateGuardianPeriodResults(guardian, periods) {
     const periodRewardsAsDelegator = generatePeriodReport(guardian.reward_as_delegator_slices, guardian.address, periods);
     const guardianSelfRewards = [], sumDelegatorRewards = [];
     for(let i = 0;i < periodRewardsAsGuardian.length;i++) {
-        guardianSelfRewards.push(periodRewardsAsGuardian[i] + periodRewardsAsDelegator[i]);
-        sumDelegatorRewards.push(periodRewardsAsGuardian[i] * guardianShareToAllDelegatorsShare - periodRewardsAsDelegator[i] )
+        const periodDelegatorReward = i < periodRewardsAsDelegator.length ? periodRewardsAsDelegator[i] : 0
+        guardianSelfRewards.push(periodRewardsAsGuardian[i] + periodDelegatorReward);
+        sumDelegatorRewards.push(periodRewardsAsGuardian[i] * guardianShareToAllDelegatorsShare - periodDelegatorReward);
     }
 
     return { 

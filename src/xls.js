@@ -14,7 +14,7 @@ export async function reportToXlsx(report) {
     
     // headers
     const header2 = ['','','','',''], header3 = ['','','','',''], header4 = ['Guardian Address','Guardian Name', 'Certified', 'Type', 'Delegaor Address'];
-    const totals = []
+    const totals = [];
     for(let i = report.details.number_of_periods-1;i >= 0;i--) {
         header2.push(`${toDate(report.details.periods[i].start_block_time)} to ${toDate(report.details.periods[i].end_block_time)} GMT`);
         header3.push(`${report.details.periods[i].start_block} to ${report.details.periods[i].end_block} (${report.details.periods[i].length} blocks)`)
@@ -27,13 +27,19 @@ export async function reportToXlsx(report) {
     for (const participant of report.participants) {
         const row = [
             participant.guardianAddress, participant.guardianName, participant.guardianCertified, 
-            participant.type, participant.delegatorAddress || '', ...participant.rewards
+            participant.type, participant.delegatorAddress || ''
         ];
         if (participant.rewards.length === 0) {
             row.push('Missing Data');
-        } else if (participant.type === 'Total') {
-            for (let i = 0;i < participant.rewards.length;i++) {
-                totals[i] = totals[i] + participant.rewards[i];
+        } else { 
+            for(let i = participant.rewards.length;i < report.details.number_of_periods;i++) {
+                row.push(0);
+            }
+            for (let i = participant.rewards.length-1;i >=0;i--) {
+                row.push(participant.rewards[i]);
+                if (participant.type === 'Total') { // notice the reverse order :)
+                    totals[report.details.number_of_periods-1-i] = totals[report.details.number_of_periods-1-i] + participant.rewards[i];
+                }
             }
         }
         worksheet.addRow(row);
