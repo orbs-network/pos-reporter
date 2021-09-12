@@ -15,7 +15,7 @@ import { reportToXlsx } from './xls.js';
 
 async function getReport(reportPeriodLength, reportNumberOfPeriods, reportShowOnlyFull) {
     const ethereumEndpoint = 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9';
-    const nodeEndpoints = ['https://0xcore.orbs.com/services/management-service/status'];
+    const nodeEndpoints = ['https://0xcore-management-direct.global.ssl.fastly.net/status'];
 
     const options = {
       period_in_blocks: new Number(reportPeriodLength).valueOf(), 
