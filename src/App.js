@@ -12,20 +12,27 @@ import "./App.css";
 
 import { getGuardiansPeriodsReport, getPeriodsReport } from './report.js';
 import { reportToXlsx } from './xls.js';
+const providersEndpoints = {
+  '1': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
+  '137': 'https://polygon-mainnet.g.alchemy.com/v2/c93z5UqYd5bR2paVR7PtUXhkVEIDIex0'
+}
+const providersNodesEndpoints = {
+  '1': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
+  '137': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
+}
+async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
+  const ethereumEndpoint = providersEndpoints[networkType];
+  const nodeEndpoints = providersNodesEndpoints[networkType];
 
-async function getReport(reportPeriodLength, reportNumberOfPeriods, reportShowOnlyFull) {
-    const ethereumEndpoint = 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9';
-    const nodeEndpoints = ['https://0xcore-management-direct.global.ssl.fastly.net/status'];
+  const options = {
+    period_in_blocks: new Number(reportPeriodLength).valueOf(),
+    periods: new Number(reportNumberOfPeriods).valueOf(),
+    show_only_full_periods: reportShowOnlyFull === 'true'
+  };
 
-    const options = {
-      period_in_blocks: new Number(reportPeriodLength).valueOf(), 
-      periods: new Number(reportNumberOfPeriods).valueOf(), 
-      show_only_full_periods: reportShowOnlyFull === 'true'
-    };
-
-    //const report = await getGuardiansPeriodsReport(guardianAddresses, includeDelegators, ethereumEndpoint, options);
-    const report = await getPeriodsReport(ethereumEndpoint, nodeEndpoints, options)
-    return reportToXlsx(report);
+  //const report = await getGuardiansPeriodsReport(guardianAddresses, includeDelegators, ethereumEndpoint, options);
+  const report = await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, options)
+  return reportToXlsx(report);
 }
 
 function downloadReport(report, reportFilenamePrefix) {
@@ -57,65 +64,85 @@ const periodOptions = [
   }
 ];
 
+const networkOptions =[
+  {
+    key: 'Ethereum',
+    text: 'Ethereum',
+    value: '1'
+  },
+  {
+    key: 'Polygon',
+    text: 'Polygon',
+    value: '137'
+  }
+];
+
 function App() {
-  const [input, setInput] = useState({reportType: '604800', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
+  const [input, setInput] = useState({reportType: '604800', networkType: '1', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
   const [loading, setLoading] = useState(false);
   const handleChange = (_e, { name, value }) => setInput({ ...input, [name]: value });
   const handleSubmit = async () => {
-    const { reportType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
+    const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
     setLoading(true);
-    const result = await getReport(reportType, reportPeriods, reportShowFull);
+    const result = await getReport(reportType, networkType, reportPeriods, reportShowFull);
     downloadReport(result, reportFilenamePrefix);
     setLoading(false);
   };
 
   return (
-    <div className="App">
-     <h2>Orbs Rewards Report Generator</h2>
-      <br />
-      <Container textAlign="left">
-      <Segment textAlign="left" secondary style={{ width: "50vw", margin: "auto" }}>
-          <Form loading={loading} onSubmit={handleSubmit} spellcheck="false">
-            <Form.Select
-              label="Report Type"
-              name="reportType"
-              options={periodOptions}
-              defaultValue="604800"
-              onChange={handleChange}
-            />
-            <Form.Input
-              label="Number Of Report Periods"
-              name="reportPeriods"
-              defaultValue="3"
-              onChange={handleChange}
-            />
-            <Form.Checkbox
-              radio
-              label="Show Only Full Periods"
-              name="reportShowFull"
-              value="true"
-              checked={input.reportShowFull === 'true'}
-              onChange={handleChange}
-            />
-            <Form.Checkbox
-              radio
-              label="Show Last Partial Period"
-              name="reportShowFull"
-              value="false"
-              checked={input.reportShowFull === 'false'}
-              onChange={handleChange}
-            />
-            <Form.Input
-              label="File Name Prefix"
-              name="reportFilenamePrefix"
-              defaultValue="report"
-              onChange={handleChange}
-            />
-            <Form.Button primary>Submit</Form.Button>
-          </Form>
-        </Segment>
-     </Container>
-    </div>
+      <div className="App">
+        <h2>Orbs Rewards Report Generator</h2>
+        <br />
+        <Container textAlign="left">
+          <Segment textAlign="left" secondary style={{ width: "50vw", margin: "auto" }}>
+            <Form loading={loading} onSubmit={handleSubmit} spellcheck="false">
+              <Form.Select
+                  label="Network"
+                  name="networkType"
+                  options={networkOptions}
+                  defaultValue="1"
+                  onChange={handleChange}
+              />
+              <Form.Select
+                  label="Report Type"
+                  name="reportType"
+                  options={periodOptions}
+                  defaultValue="604800"
+                  onChange={handleChange}
+              />
+              <Form.Input
+                  label="Number Of Report Periods"
+                  name="reportPeriods"
+                  defaultValue="3"
+                  onChange={handleChange}
+              />
+              <Form.Checkbox
+                  radio
+                  label="Show Only Full Periods"
+                  name="reportShowFull"
+                  value="true"
+                  checked={input.reportShowFull === 'true'}
+                  onChange={handleChange}
+              />
+              <Form.Checkbox
+                  radio
+                  label="Show Last Partial Period"
+                  name="reportShowFull"
+                  value="false"
+                  checked={input.reportShowFull === 'false'}
+                  onChange={handleChange}
+              />
+              <Form.Input
+                  label="File Name Prefix"
+                  name="reportFilenamePrefix"
+                  defaultValue="report"
+                  onChange={handleChange}
+              />
+              <Form.Button primary>Submit</Form.Button>
+            </Form>
+          </Segment>
+        </Container>
+      </div>
   );
 }
 

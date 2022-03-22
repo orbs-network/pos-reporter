@@ -7,14 +7,15 @@
  */
 
 import _  from 'lodash';
-import { getDelegatorStakingRewards, getGuardian, getGuardians, getStartOfRewardsBlock, getWeb3 } from "@orbs-network/pos-analytics-lib";
+import { getDelegatorStakingRewards, getGuardian, getGuardians, getStartOfRewardsBlock, getWeb3, getWeb3Polygon } from "@orbs-network/pos-analytics-lib";
 
 const DefaultPeriodBlocks = 604800;
 const DefualtPeriods = 3;
 const DefaultAbsoluteStartBlock = getStartOfRewardsBlock();
 const DefaultExcluded = ['0x4aca0c63e351b2ea44ee628425710e933b5b3396', '0xca0ff0479bd7f52e55e65da7b76074b477b734b3'];
+const web3Mapping = {'1': getWeb3, '137': getWeb3Polygon}
 
-export async function getPeriodsReport(ethereumEndpoint, nodeEndpoints, options) {
+export async function getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, options) {
     const interestingGuardians = [];
     const calculateDelegators = [];
     const excluded = options.exclude_guardians || DefaultExcluded;
@@ -25,11 +26,11 @@ export async function getPeriodsReport(ethereumEndpoint, nodeEndpoints, options)
         }
     });
 
-    return getGuardiansPeriodsReport(interestingGuardians, calculateDelegators, ethereumEndpoint, options);
+    return getGuardiansPeriodsReport(interestingGuardians, networkType, calculateDelegators, ethereumEndpoint, options);
 }
 
-export async function getGuardiansPeriodsReport(guardianAddresses, calculateDelegators, ethereumEndpoint, options) {
-    const web3 = _.isString(ethereumEndpoint) ? await getWeb3(ethereumEndpoint) : ethereumEndpoint;
+export async function getGuardiansPeriodsReport(guardianAddresses, networkType, calculateDelegators, ethereumEndpoint, options) {
+    const web3 = _.isString(ethereumEndpoint) ? await web3Mapping[networkType](ethereumEndpoint) : ethereumEndpoint;
 
     const reportDetails = await generatePeriodDetails(options, web3);
     const participants = [];
