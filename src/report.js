@@ -13,13 +13,13 @@ const DefaultPeriodBlocks = 604800;
 const DefualtPeriods = 3;
 const DefaultAbsoluteStartBlock = getStartOfRewardsBlock();
 const DefaultExcluded = ['0x4aca0c63e351b2ea44ee628425710e933b5b3396', '0xca0ff0479bd7f52e55e65da7b76074b477b734b3'];
-const web3Mapping = {'1': getWeb3, '137': getWeb3Polygon}
+const web3Mapping = {'ethereum': getWeb3, 'polygon': getWeb3Polygon}
 
-export async function getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, options) {
+export async function getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options) {
     const interestingGuardians = [];
     const calculateDelegators = [];
     const excluded = options.exclude_guardians || DefaultExcluded;
-    _.forEach(await getGuardians(nodeEndpoints), g => {
+    _.forEach(await getGuardians(nodeEndpoints, ethNodeEndpoints), g => {
         if (!excluded.includes(g.address)) {
             interestingGuardians.push(g.address);
             calculateDelegators.push(!g.certified);
@@ -108,6 +108,7 @@ async function getGuardianPeriodsReport(address, calculateDelegators, web3, repo
         sleep(1000); // just in case
         gInfo = await getGuardian(address, web3, readOptions);
     }
+    gInfo.details.certified = !calculateDelegators; // set the certified info calculated based on eth network
     const res = generateGuardianPeriodResults(gInfo, report.periods);
     participantsRewards.push(generateParticipantObject(gInfo, 'Total', res.allGuardianRewards));
     participantsRewards.push(generateParticipantObject(gInfo, 'Self-Share (guardian + self-delegate)', res.guardianSelfRewards));

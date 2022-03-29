@@ -13,16 +13,17 @@ import "./App.css";
 import { getGuardiansPeriodsReport, getPeriodsReport } from './report.js';
 import { reportToXlsx } from './xls.js';
 const providersEndpoints = {
-  '1': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
-  '137': 'https://polygon-mainnet.g.alchemy.com/v2/c93z5UqYd5bR2paVR7PtUXhkVEIDIex0'
+  'ethereum': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
+  'polygon': 'https://polygon-mainnet.g.alchemy.com/v2/c93z5UqYd5bR2paVR7PtUXhkVEIDIex0'
 }
 const providersNodesEndpoints = {
-  '1': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
-  '137': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
+  'ethereum': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
+  'polygon': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
 }
 async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
   const ethereumEndpoint = providersEndpoints[networkType];
   const nodeEndpoints = providersNodesEndpoints[networkType];
+  const ethNodeEndpoints = providersNodesEndpoints['ethereum'];
 
   const options = {
     period_in_blocks: new Number(reportPeriodLength).valueOf(),
@@ -30,9 +31,44 @@ async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods,
     show_only_full_periods: reportShowOnlyFull === 'true'
   };
 
-  //const report = await getGuardiansPeriodsReport(guardianAddresses, includeDelegators, ethereumEndpoint, options);
-  const report = await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, options)
-  return reportToXlsx(report);
+  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options)
+}
+
+function joinReports(report1, report2) {
+  let result = {
+    details: report1.details,
+    participants: []
+  }
+
+  const participants = report1.participants.concat(report2.participants);
+
+  for (let i=0; i<participants.length-1; i++) {
+    let foundMatch = false;
+    for (let j=i+1; j<participants.length; j++) {
+      if ((participants[i].guardianAddress === participants[j].guardianAddress && participants[i].type === participants[j].type)
+          && (!['Delegator', 'Historical Delegator'].includes(participants[i].type) || (participants[i].delegatorAddress === participants[j].delegatorAddress))) {
+        // condition to match and sum up the rewards: same guardian and type. if type in ['Delegator', 'Historical Delegator'] then only sum the same delegator, otherwise add to result set
+        foundMatch = true;
+        let p = participants[i];
+        p.rewards = participants[i].rewards.map(function (num, idx) {
+          return num + participants[j].rewards[idx];
+        });
+        result.participants.push(p);
+        participants.splice(j, 1); // remove to prevent duplicates
+        break;
+      }
+    }
+    if (!foundMatch) result.participants.push(participants[i]);
+  }
+
+  // sort the results
+  const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
+  result.participants.sort((a, b) => {
+    if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
+    return a.guardianAddress > b.guardianAddress ? 1 : -1;
+  });
+
+  return result;
 }
 
 function downloadReport(report, reportFilenamePrefix) {
@@ -66,25 +102,39 @@ const periodOptions = [
 
 const networkOptions =[
   {
+    key: 'All',
+    text: 'All',
+    value: 'all'
+  },
+  {
     key: 'Ethereum',
     text: 'Ethereum',
-    value: '1'
+    value: 'ethereum'
   },
   {
     key: 'Polygon',
     text: 'Polygon',
-    value: '137'
+    value: 'polygon'
   }
 ];
 
 function App() {
-  const [input, setInput] = useState({reportType: '604800', networkType: '1', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
+  const [input, setInput] = useState({reportType: '604800', networkType: 'all', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
   const [loading, setLoading] = useState(false);
   const handleChange = (_e, { name, value }) => setInput({ ...input, [name]: value });
   const handleSubmit = async () => {
     const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
     setLoading(true);
-    const result = await getReport(reportType, networkType, reportPeriods, reportShowFull);
+    let report = null;
+    if (networkType === 'all') {
+      const ethResult = await getReport(reportType, 'ethereum', reportPeriods, reportShowFull);
+      const polyResult = await getReport(reportType, 'polygon', reportPeriods, reportShowFull);
+      report = joinReports(ethResult, polyResult)
+    }
+    else {
+      report = await getReport(reportType, networkType, reportPeriods, reportShowFull);
+    }
+    const result = await reportToXlsx(report)
     downloadReport(result, reportFilenamePrefix);
     setLoading(false);
   };
@@ -100,7 +150,7 @@ function App() {
                   label="Network"
                   name="networkType"
                   options={networkOptions}
-                  defaultValue="1"
+                  defaultValue="all"
                   onChange={handleChange}
               />
               <Form.Select
