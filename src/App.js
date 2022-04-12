@@ -10,7 +10,7 @@ import React, { useState } from "react";
 import { Container, Segment, Form } from "semantic-ui-react";
 import "./App.css";
 
-import { getGuardiansPeriodsReport, getPeriodsReport } from './report.js';
+import { getPeriodsReport, generatePeriodsStart, getWeb3 } from './report.js';
 import { reportToXlsx } from './xls.js';
 const providersEndpoints = {
   'ethereum': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
@@ -20,18 +20,26 @@ const providersNodesEndpoints = {
   'ethereum': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
   'polygon': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
 }
+const PeriodInBlocks = {
+  'Quarterly': {'ethereum': '604800', 'polygon': '3435449'},
+  'Monthly': {'ethereum': '199385', 'polygon': '1132565'},
+  'Weekly': {'ethereum': '46525', 'polygon': '264265'}
+}
 async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
   const ethereumEndpoint = providersEndpoints[networkType];
   const nodeEndpoints = providersNodesEndpoints[networkType];
   const ethNodeEndpoints = providersNodesEndpoints['ethereum'];
 
-  const options = {
-    period_in_blocks: new Number(reportPeriodLength).valueOf(),
+  let options = {
+    period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]['ethereum']).valueOf(),
     periods: new Number(reportNumberOfPeriods).valueOf(),
     show_only_full_periods: reportShowOnlyFull === 'true'
   };
+  const web3 = await getWeb3(providersEndpoints['ethereum']);
+  const periods_start = await generatePeriodsStart(options, web3)
 
-  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options)
+  options.period_in_blocks = new Number(PeriodInBlocks[reportPeriodLength][networkType]).valueOf()
+  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periods_start)
 }
 
 function joinReports(report1, report2) {
@@ -61,13 +69,6 @@ function joinReports(report1, report2) {
     if (!foundMatch) result.participants.push(participants[i]);
   }
 
-  // sort the results
-  const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
-  result.participants.sort((a, b) => {
-    if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
-    return a.guardianAddress > b.guardianAddress ? 1 : -1;
-  });
-
   return result;
 }
 
@@ -86,17 +87,17 @@ const periodOptions = [
   {
     key: 'Quarterly',
     text: 'Quarterly (91 days)',
-    value: '604800'
+    value: 'Quarterly'
   },
   {
     key: 'Monthly',
     text: 'Monthly (30 days)',
-    value: '199385'
+    value: 'Monthly'
   },
   {
     key: 'Weekly',
     text: 'Weekly (7 days)',
-    value: '46525'
+    value: 'Weekly'
   }
 ];
 
@@ -119,7 +120,7 @@ const networkOptions =[
 ];
 
 function App() {
-  const [input, setInput] = useState({reportType: '604800', networkType: 'all', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
+  const [input, setInput] = useState({reportType: 'Quarterly', networkType: 'all', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
   const [loading, setLoading] = useState(false);
   const handleChange = (_e, { name, value }) => setInput({ ...input, [name]: value });
   const handleSubmit = async () => {
@@ -134,6 +135,14 @@ function App() {
     else {
       report = await getReport(reportType, networkType, reportPeriods, reportShowFull);
     }
+
+    // sort the results
+    const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
+    report.participants.sort((a, b) => {
+      if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
+      return a.guardianAddress > b.guardianAddress ? 1 : -1;
+    });
+
     const result = await reportToXlsx(report)
     downloadReport(result, reportFilenamePrefix);
     setLoading(false);
@@ -157,7 +166,7 @@ function App() {
                   label="Report Type"
                   name="reportType"
                   options={periodOptions}
-                  defaultValue="604800"
+                  defaultValue="Quarterly"
                   onChange={handleChange}
               />
               <Form.Input
