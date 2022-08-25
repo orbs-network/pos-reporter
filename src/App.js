@@ -10,22 +10,66 @@ import React, { useState } from "react";
 import { Container, Segment, Form } from "semantic-ui-react";
 import "./App.css";
 
-import { getGuardiansPeriodsReport, getPeriodsReport } from './report.js';
+import { getPeriodsReport, generatePeriodsStart, getWeb3 } from './report.js';
 import { reportToXlsx } from './xls.js';
+const providersEndpoints = {
+  'ethereum': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
+  'polygon': 'https://polygon-mainnet.g.alchemy.com/v2/c93z5UqYd5bR2paVR7PtUXhkVEIDIex0'
+}
+const providersNodesEndpoints = {
+  'ethereum': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
+  'polygon': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
+}
+const PeriodInBlocks = {
+  'Quarterly': {'ethereum': '604800', 'polygon': '3435449'},
+  'Monthly': {'ethereum': '199385', 'polygon': '1132565'},
+  'Weekly': {'ethereum': '46525', 'polygon': '264265'}
+}
+async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
+  const ethereumEndpoint = providersEndpoints[networkType];
+  const nodeEndpoints = providersNodesEndpoints[networkType];
+  const ethNodeEndpoints = providersNodesEndpoints['ethereum'];
 
-async function getReport(reportPeriodLength, reportNumberOfPeriods, reportShowOnlyFull) {
-    const ethereumEndpoint = 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9';
-    const nodeEndpoints = ['https://0xcore-management-direct.global.ssl.fastly.net/status'];
+  let options = {
+    period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]['ethereum']).valueOf(),
+    periods: new Number(reportNumberOfPeriods).valueOf(),
+    show_only_full_periods: reportShowOnlyFull === 'true'
+  };
+  const web3 = await getWeb3(providersEndpoints['ethereum']);
+  const periods_start = await generatePeriodsStart(options, web3)
 
-    const options = {
-      period_in_blocks: new Number(reportPeriodLength).valueOf(), 
-      periods: new Number(reportNumberOfPeriods).valueOf(), 
-      show_only_full_periods: reportShowOnlyFull === 'true'
-    };
+  options.period_in_blocks = new Number(PeriodInBlocks[reportPeriodLength][networkType]).valueOf()
+  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periods_start)
+}
 
-    //const report = await getGuardiansPeriodsReport(guardianAddresses, includeDelegators, ethereumEndpoint, options);
-    const report = await getPeriodsReport(ethereumEndpoint, nodeEndpoints, options)
-    return reportToXlsx(report);
+function joinReports(report1, report2) {
+  let result = {
+    details: report1.details,
+    participants: []
+  }
+
+  const participants = report1.participants.concat(report2.participants);
+
+  for (let i=0; i<participants.length-1; i++) {
+    let foundMatch = false;
+    for (let j=i+1; j<participants.length; j++) {
+      if ((participants[i].guardianAddress === participants[j].guardianAddress && participants[i].type === participants[j].type)
+          && (!['Delegator', 'Historical Delegator'].includes(participants[i].type) || (participants[i].delegatorAddress === participants[j].delegatorAddress))) {
+        // condition to match and sum up the rewards: same guardian and type. if type in ['Delegator', 'Historical Delegator'] then only sum the same delegator, otherwise add to result set
+        foundMatch = true;
+        let p = participants[i];
+        p.rewards = participants[i].rewards.map(function (num, idx) {
+          return num + participants[j].rewards[idx];
+        });
+        result.participants.push(p);
+        participants.splice(j, 1); // remove to prevent duplicates
+        break;
+      }
+    }
+    if (!foundMatch) result.participants.push(participants[i]);
+  }
+
+  return result;
 }
 
 function downloadReport(report, reportFilenamePrefix) {
@@ -43,79 +87,121 @@ const periodOptions = [
   {
     key: 'Quarterly',
     text: 'Quarterly (91 days)',
-    value: '604800'
+    value: 'Quarterly'
   },
   {
     key: 'Monthly',
     text: 'Monthly (30 days)',
-    value: '199385'
+    value: 'Monthly'
   },
   {
     key: 'Weekly',
     text: 'Weekly (7 days)',
-    value: '46525'
+    value: 'Weekly'
+  }
+];
+
+const networkOptions =[
+  {
+    key: 'All',
+    text: 'All',
+    value: 'all'
+  },
+  {
+    key: 'Ethereum',
+    text: 'Ethereum',
+    value: 'ethereum'
+  },
+  {
+    key: 'Polygon',
+    text: 'Polygon',
+    value: 'polygon'
   }
 ];
 
 function App() {
-  const [input, setInput] = useState({reportType: '604800', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
+  const [input, setInput] = useState({reportType: 'Quarterly', networkType: 'all', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
   const [loading, setLoading] = useState(false);
   const handleChange = (_e, { name, value }) => setInput({ ...input, [name]: value });
   const handleSubmit = async () => {
-    const { reportType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
+    const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
     setLoading(true);
-    const result = await getReport(reportType, reportPeriods, reportShowFull);
+    let report = null;
+    if (networkType === 'all') {
+      const ethResult = await getReport(reportType, 'ethereum', reportPeriods, reportShowFull);
+      const polyResult = await getReport(reportType, 'polygon', reportPeriods, reportShowFull);
+      report = joinReports(ethResult, polyResult)
+    }
+    else {
+      report = await getReport(reportType, networkType, reportPeriods, reportShowFull);
+    }
+
+    // sort the results
+    const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
+    report.participants.sort((a, b) => {
+      if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
+      return a.guardianAddress > b.guardianAddress ? 1 : -1;
+    });
+
+    const result = await reportToXlsx(report)
     downloadReport(result, reportFilenamePrefix);
     setLoading(false);
   };
 
   return (
-    <div className="App">
-     <h2>Orbs Rewards Report Generator</h2>
-      <br />
-      <Container textAlign="left">
-      <Segment textAlign="left" secondary style={{ width: "50vw", margin: "auto" }}>
-          <Form loading={loading} onSubmit={handleSubmit} spellcheck="false">
-            <Form.Select
-              label="Report Type"
-              name="reportType"
-              options={periodOptions}
-              defaultValue="604800"
-              onChange={handleChange}
-            />
-            <Form.Input
-              label="Number Of Report Periods"
-              name="reportPeriods"
-              defaultValue="3"
-              onChange={handleChange}
-            />
-            <Form.Checkbox
-              radio
-              label="Show Only Full Periods"
-              name="reportShowFull"
-              value="true"
-              checked={input.reportShowFull === 'true'}
-              onChange={handleChange}
-            />
-            <Form.Checkbox
-              radio
-              label="Show Last Partial Period"
-              name="reportShowFull"
-              value="false"
-              checked={input.reportShowFull === 'false'}
-              onChange={handleChange}
-            />
-            <Form.Input
-              label="File Name Prefix"
-              name="reportFilenamePrefix"
-              defaultValue="report"
-              onChange={handleChange}
-            />
-            <Form.Button primary>Submit</Form.Button>
-          </Form>
-        </Segment>
-     </Container>
-    </div>
+      <div className="App">
+        <h2>Orbs Rewards Report Generator</h2>
+        <br />
+        <Container textAlign="left">
+          <Segment textAlign="left" secondary style={{ width: "50vw", margin: "auto" }}>
+            <Form loading={loading} onSubmit={handleSubmit} spellcheck="false">
+              <Form.Select
+                  label="Network"
+                  name="networkType"
+                  options={networkOptions}
+                  defaultValue="all"
+                  onChange={handleChange}
+              />
+              <Form.Select
+                  label="Report Type"
+                  name="reportType"
+                  options={periodOptions}
+                  defaultValue="Quarterly"
+                  onChange={handleChange}
+              />
+              <Form.Input
+                  label="Number Of Report Periods"
+                  name="reportPeriods"
+                  defaultValue="3"
+                  onChange={handleChange}
+              />
+              <Form.Checkbox
+                  radio
+                  label="Show Only Full Periods"
+                  name="reportShowFull"
+                  value="true"
+                  checked={input.reportShowFull === 'true'}
+                  onChange={handleChange}
+              />
+              <Form.Checkbox
+                  radio
+                  label="Show Last Partial Period"
+                  name="reportShowFull"
+                  value="false"
+                  checked={input.reportShowFull === 'false'}
+                  onChange={handleChange}
+              />
+              <Form.Input
+                  label="File Name Prefix"
+                  name="reportFilenamePrefix"
+                  defaultValue="report"
+                  onChange={handleChange}
+              />
+              <Form.Button primary>Submit</Form.Button>
+            </Form>
+          </Segment>
+        </Container>
+      </div>
   );
 }
 
