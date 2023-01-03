@@ -18,7 +18,8 @@ const web3Mapping = {'ethereum': getWeb3, 'polygon': getWeb3Polygon}
 export {getWeb3};
 
 async function getBlockByTimestamp(timestamp, chainId) {
-    const apiUrl = `https://api.${chainId===1?'etherscan':'polygonscan'}.com/api?module=block&action=getblocknobytime&closest=before&apikey=I59W5KDGZ19SHUHAYDWBWXWU2BJE5AM7E7&timestamp=${timestamp}`
+    const apiUrl = chainId === 137 ? `https://api.polygonscan.com/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=before&apikey=BEVY6JKW1VTU634UWBE2FZYKN3EDB3RZSR` :
+        `https://api.etherscan.io/api?module=block&action=getblocknobytime&closest=before&timestamp=${timestamp}&apikey=3U9E3HF8WYHXHCHNPP8E3AP8V7H2V8XU4T`
     const response = await fetch(apiUrl);
     const json = await response.json();
     if (json.status !== '1') {

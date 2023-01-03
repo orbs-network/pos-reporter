@@ -30,16 +30,39 @@ async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods,
   const nodeEndpoints = providersNodesEndpoints[networkType];
   const ethNodeEndpoints = providersNodesEndpoints['ethereum'];
 
-  let options = {
-    period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]['ethereum']).valueOf(),
-    periods: new Number(reportNumberOfPeriods).valueOf(),
-    show_only_full_periods: reportShowOnlyFull === 'true'
-  };
-  const web3 = await getWeb3(providersEndpoints['ethereum']);
-  const periods_start = await generatePeriodsStart(options, web3)
+  const web3Eth = await getWeb3(providersEndpoints['ethereum']);
+  let periodsStartEth;
+  let options;
 
-  options.period_in_blocks = new Number(PeriodInBlocks[reportPeriodLength][networkType]).valueOf()
-  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periods_start)
+  if (reportPeriodLength === "Custom") {
+    // 1 period. Start = reportNumberOfPeriods ("From block")
+    let blockNumber;
+    if (networkType === 'polygon') {
+      const web3 = await getWeb3(providersEndpoints['polygon']);
+      blockNumber = (await web3.eth.getBlock("latest")).number;
+    } else {
+      blockNumber = (await web3Eth.eth.getBlock("latest")).number;
+    }
+    const period_in_blocks = blockNumber - parseInt(reportNumberOfPeriods);
+    options = {
+      period_in_blocks: period_in_blocks,
+      periods: 1,
+      show_only_full_periods: reportShowOnlyFull === 'true'
+    };
+
+    const block = await web3Eth.eth.getBlock(reportNumberOfPeriods);
+    periodsStartEth = [{number: block.number, time: block.timestamp}];
+  }
+  else {
+    options = {
+      period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]['ethereum']).valueOf(),
+      periods: new Number(reportNumberOfPeriods).valueOf(),
+      show_only_full_periods: reportShowOnlyFull === 'true'
+    };
+    periodsStartEth = await generatePeriodsStart(options, web3Eth)
+    options.period_in_blocks = new Number(PeriodInBlocks[reportPeriodLength][networkType]).valueOf()
+  }
+  return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periodsStartEth)
 }
 
 function joinReports(report1, report2) {
@@ -98,6 +121,11 @@ const periodOptions = [
     key: 'Weekly',
     text: 'Weekly (7 days)',
     value: 'Weekly'
+  },
+  {
+    key: 'Custom',
+    text: 'Custom (From block #)',
+    value: 'Custom'
   }
 ];
 
@@ -123,8 +151,8 @@ function App() {
   const [input, setInput] = useState({reportType: 'Quarterly', networkType: 'all', reportPeriods: '3', reportShowFull: 'false', reportFilenamePrefix: "report"});
   const [loading, setLoading] = useState(false);
   const handleChange = (_e, { name, value }) => setInput({ ...input, [name]: value });
+  const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
   const handleSubmit = async () => {
-    const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
     setLoading(true);
     let report = null;
     if (networkType === 'all') {
@@ -170,7 +198,7 @@ function App() {
                   onChange={handleChange}
               />
               <Form.Input
-                  label="Number Of Report Periods"
+                  label={reportType === 'Custom' ? 'From Block' : "Number Of Report Periods"}
                   name="reportPeriods"
                   defaultValue="3"
                   onChange={handleChange}
