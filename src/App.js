@@ -13,8 +13,8 @@ import "./App.css";
 import { getPeriodsReport, generatePeriodsStart, getWeb3 } from './report.js';
 import { reportToXlsx } from './xls.js';
 const providersEndpoints = {
-  'ethereum': 'https://mainnet.infura.io/v3/e0abafac3c8d46c3a9befb6e8b14abc9',
-  'polygon': 'https://polygon-mainnet.g.alchemy.com/v2/c93z5UqYd5bR2paVR7PtUXhkVEIDIex0'
+  'ethereum': process.env.REACT_APP_ETHEREUM_RPC,
+  'polygon': process.env.REACT_APP_POLYGON_RPC
 }
 const providersNodesEndpoints = {
   'ethereum': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],

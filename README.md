@@ -7,6 +7,8 @@ The Project works in tandem with [github.com/orbs-network/pos-analytics-lib](orb
 git clone https://github.com/orbs-network/pos-reporter
 ```
 
+* Create a .env file with `REACT_APP_ETHEREUM_RPC` and `REACT_APP_POLYGON_RPC` entries.
+
 In the project directory, you can run:
 
 * Install
