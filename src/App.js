@@ -21,9 +21,9 @@ const providersNodesEndpoints = {
   'polygon': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
 }
 const PeriodInBlocks = {
-  'Quarterly': {'ethereum': '604800', 'polygon': '3435449'},
-  'Monthly': {'ethereum': '199385', 'polygon': '1132565'},
-  'Weekly': {'ethereum': '46525', 'polygon': '264265'}
+  Quarterly: { ethereum: "645847", polygon: "3888000" },
+  Monthly:   { ethereum: "215282", polygon: "1296000" },
+  Weekly:    { ethereum: "50233",  polygon: "302400"  }
 }
 async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
   const ethereumEndpoint = providersEndpoints[networkType];
