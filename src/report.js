@@ -47,12 +47,21 @@ export async function getGuardiansPeriodsReport(guardianAddresses, networkType, 
     const reportDetails = await generatePeriodDetails(options, web3, periods_start);
     const participants = [];
 
-    for (let i = 0;i < guardianAddresses.length;i++) {
-        try {
-             participants.push(...(await getGuardianPeriodsReport(guardianAddresses[i], calculateDelegators[i], web3, reportDetails)));
-        } catch (e) {
-            participants.push({guardianAddress: guardianAddresses[i], rewards: []});
-            console.log(`Error while generating guardian ${guardianAddresses[i]}: ${e} ... (skipped)`);
+    const guardianPromises = guardianAddresses.map((address, i) =>
+        getGuardianPeriodsReport(address, calculateDelegators[i], web3, reportDetails)
+            .then(result => ({ status: 'fulfilled', value: result, address }))
+            .catch(e => {
+                console.log(`Error while generating guardian ${address}: ${e} ... (skipped)`);
+                return { status: 'rejected', address };
+            })
+    );
+
+    const results = await Promise.all(guardianPromises);
+    for (const result of results) {
+        if (result.status === 'fulfilled') {
+            participants.push(...result.value);
+        } else {
+            participants.push({ guardianAddress: result.address, rewards: [] });
         }
     }
 

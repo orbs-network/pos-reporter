@@ -156,8 +156,10 @@ function App() {
     setLoading(true);
     let report = null;
     if (networkType === 'all') {
-      const ethResult = await getReport(reportType, 'ethereum', reportPeriods, reportShowFull);
-      const polyResult = await getReport(reportType, 'polygon', reportPeriods, reportShowFull);
+      const [ethResult, polyResult] = await Promise.all([
+        getReport(reportType, 'ethereum', reportPeriods, reportShowFull),
+        getReport(reportType, 'polygon', reportPeriods, reportShowFull)
+      ]);
       report = joinReports(ethResult, polyResult)
     }
     else {

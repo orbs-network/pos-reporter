@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://orbs-network.github.io/pos-reporter/",
   "dependencies": {
-    "@orbs-network/pos-analytics-lib": "^0.9.3",
+    "@orbs-network/pos-analytics-lib": "^0.9.11",
     "exceljs": "^4.2.0",
     "lodash": "^4.17.20",
     "react": "^16.13.1",
@@ -16,7 +16,7 @@
     "semantic-ui-react": "^2.0.3"
   },
   "scripts": {
-    "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
+    "start": "react-scripts start",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
     "test": "NODE_OPTIONS=--openssl-legacy-provider react-scripts test",
     "predeploy": "npm run build",
