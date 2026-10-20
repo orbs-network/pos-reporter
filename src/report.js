@@ -11,20 +11,26 @@ import { getDelegatorStakingRewards, getGuardian, getGuardians, getStartOfReward
 
 const DefaultPeriodBlocks = 604800;
 const DefualtPeriods = 3;
-const blockDuration = {1: 13, 137: 2}
 const DefaultAbsoluteStartBlock = getStartOfRewardsBlock();
 const DefaultExcluded = ['0x4aca0c63e351b2ea44ee628425710e933b5b3396', '0xca0ff0479bd7f52e55e65da7b76074b477b734b3'];
-const web3Mapping = {'ethereum': getWeb3, 'polygon': getWeb3Polygon}
+const EtherscanApiKey = 'EUUDTESUHF3YEDN6MGX1RJZZ7SJDDD5KCF';
+// polygon providers limit eth_getLogs to 10K blocks, so polygon events are read through etherscan
+const web3Mapping = {'ethereum': getWeb3, 'polygon': endpoint => getWeb3Polygon(endpoint, true, true, EtherscanApiKey)}
 export {getWeb3};
 
 async function getBlockByTimestamp(timestamp, chainId) {
-    const apiUrl = `https://api.etherscan.io/v2/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=before&apikey=EUUDTESUHF3YEDN6MGX1RJZZ7SJDDD5KCF&chainid=${chainId}`
-    const response = await fetch(apiUrl);
-    const json = await response.json();
-    if (json.status !== '1') {
-        alert("An error occurred. Please try again")
+    const apiUrl = `https://api.etherscan.io/v2/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=before&apikey=${EtherscanApiKey}&chainid=${chainId}`
+    for (let attempt = 1; ; attempt++) {
+        const response = await fetch(apiUrl);
+        const json = await response.json();
+        if (json.status === '1') {
+            return parseInt(json.result);
+        }
+        if (!/rate limit/i.test(json.result) || attempt === 5) {
+            throw new Error(`Etherscan block lookup for timestamp ${timestamp} on chain ${chainId} failed: ${json.message} ${json.result}`);
+        }
+        await sleep(1000 * attempt); // free tier allows 3 calls/sec
     }
-    return parseInt(json.result);
 }
 
 export async function getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periods_start) {
@@ -65,7 +71,7 @@ export async function getGuardiansPeriodsReport(guardianAddresses, networkType, 
         }
     }
 
-    trimNonFullPeriodIfNeeded(reportDetails, participants, options);
+    trimNonFullPeriodIfNeeded(reportDetails, participants, options, periods_start);
     
     return {
         details: reportDetails,
@@ -87,6 +93,9 @@ export async function generatePeriodsStart(options, web3) {
         const block_info = await web3.eth.getBlock(currStart);
         const block_ts = block_info.timestamp;
         periodsStart.push({'number': currStart, 'time': block_ts});
+        if (periodsStart.length === 1) { // decided here on ethereum blocks so all chains trim the same periods
+            periodsStart[0].partial = currEnd - currStart + 1 < periodLength;
+        }
         currEnd = currStart - 1;
         currStart = currEnd - periodLength + 1;
     } while (periodsStart.length < maxPeriods && currStart >= DefaultAbsoluteStartBlock.number)
@@ -98,10 +107,10 @@ export async function generatePeriodsStart(options, web3) {
 async function generatePeriodDetails(options, web3, periods_start) {
     const maxEndBlock = await web3.eth.getBlock('latest');
     const periods = []; 
-    const periodLength = options.period_in_blocks || DefaultPeriodBlocks;
     const chainId = await web3.eth.getChainId();
 
     const txs = [];
+    const endTxs = [];
     let currEnd = maxEndBlock.number;
     let totalLength = 0;
 
@@ -116,13 +125,14 @@ async function generatePeriodDetails(options, web3, periods_start) {
         });
         totalLength += (currEnd-currStart+1);
         txs.push(web3.eth.getBlock(currStart));
+        endTxs.push(currEnd === maxEndBlock.number ? maxEndBlock : web3.eth.getBlock(currEnd));
         currEnd = currStart - 1;
-        currStart = currEnd - periodLength + 1;
     }
 
     const res = await Promise.all(txs);
+    const endRes = await Promise.all(endTxs);
     for(let i = 0;i < periods.length;i++) {
-        periods[i].end_block_time = Number(i === 0 ? maxEndBlock.timestamp : res[i-1].timestamp - blockDuration[chainId]);
+        periods[i].end_block_time = Number(endRes[i].timestamp);
         periods[i].start_block_time = Number(res[i].timestamp);
     }
  
@@ -259,9 +269,8 @@ function generateParticipantObject(guardian, type, rewards, delegatorAddress) {
     };
 }
 
-function trimNonFullPeriodIfNeeded(details, participants, options) {
-    const periodLength = options.period_in_blocks || DefaultPeriodBlocks;
-    if (details.periods.length > 1 && details.periods[0].length < periodLength && options.show_only_full_periods === true) {
+function trimNonFullPeriodIfNeeded(details, participants, options, periods_start) {
+    if (details.periods.length > 1 && periods_start[0].partial === true && options.show_only_full_periods === true) {
         details.total_length_of_periods = details.total_length_of_periods - details.periods[0].length;
         details.periods.shift();
         details.number_of_periods = details.number_of_periods - 1;

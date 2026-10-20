@@ -20,10 +20,11 @@ const providersNodesEndpoints = {
   'ethereum': ['https://0xcore-management-direct.global.ssl.fastly.net/status'],
   'polygon': ['https://0xcore-matic-reader-direct.global.ssl.fastly.net/status']
 }
+// in ethereum blocks: periods are aligned on ethereum and mapped to other chains by timestamp
 const PeriodInBlocks = {
-  Quarterly: { ethereum: "645847", polygon: "3888000" },
-  Monthly:   { ethereum: "215282", polygon: "1296000" },
-  Weekly:    { ethereum: "50233",  polygon: "302400"  }
+  Quarterly: "645847",
+  Monthly:   "215282",
+  Weekly:    "50233"
 }
 async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods, reportShowOnlyFull) {
   const ethereumEndpoint = providersEndpoints[networkType];
@@ -38,7 +39,7 @@ async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods,
     // 1 period. Start = reportNumberOfPeriods ("From block")
     let blockNumber;
     if (networkType === 'polygon') {
-      const web3 = await getWeb3(providersEndpoints['polygon']);
+      const web3 = await getWeb3(providersEndpoints['polygon'], false); // only the latest block is needed, don't read contracts
       blockNumber = (await web3.eth.getBlock("latest")).number;
     } else {
       blockNumber = (await web3Eth.eth.getBlock("latest")).number;
@@ -55,12 +56,11 @@ async function getReport(reportPeriodLength, networkType, reportNumberOfPeriods,
   }
   else {
     options = {
-      period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]['ethereum']).valueOf(),
+      period_in_blocks: new Number(PeriodInBlocks[reportPeriodLength]).valueOf(),
       periods: new Number(reportNumberOfPeriods).valueOf(),
       show_only_full_periods: reportShowOnlyFull === 'true'
     };
     periodsStartEth = await generatePeriodsStart(options, web3Eth)
-    options.period_in_blocks = new Number(PeriodInBlocks[reportPeriodLength][networkType]).valueOf()
   }
   return await getPeriodsReport(ethereumEndpoint, networkType, nodeEndpoints, ethNodeEndpoints, options, periodsStartEth)
 }
@@ -154,28 +154,34 @@ function App() {
   const { reportType, networkType, reportPeriods, reportShowFull, reportFilenamePrefix } = input;
   const handleSubmit = async () => {
     setLoading(true);
-    let report = null;
-    if (networkType === 'all') {
-      const [ethResult, polyResult] = await Promise.all([
-        getReport(reportType, 'ethereum', reportPeriods, reportShowFull),
-        getReport(reportType, 'polygon', reportPeriods, reportShowFull)
-      ]);
-      report = joinReports(ethResult, polyResult)
-    }
-    else {
-      report = await getReport(reportType, networkType, reportPeriods, reportShowFull);
-    }
+    try {
+      let report = null;
+      if (networkType === 'all') {
+        const [ethResult, polyResult] = await Promise.all([
+          getReport(reportType, 'ethereum', reportPeriods, reportShowFull),
+          getReport(reportType, 'polygon', reportPeriods, reportShowFull)
+        ]);
+        report = joinReports(ethResult, polyResult)
+      }
+      else {
+        report = await getReport(reportType, networkType, reportPeriods, reportShowFull);
+      }
 
-    // sort the results
-    const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
-    report.participants.sort((a, b) => {
-      if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
-      return a.guardianAddress > b.guardianAddress ? 1 : -1;
-    });
+      // sort the results
+      const typesOrder = ['Total', 'Self-Share (guardian + self-delegate)', 'Total Delegators', 'Delegator', 'Historical Delegator'];
+      report.participants.sort((a, b) => {
+        if (a.guardianAddress === b.guardianAddress) return typesOrder.indexOf(a.type) - typesOrder.indexOf(b.type);
+        return a.guardianAddress > b.guardianAddress ? 1 : -1;
+      });
 
-    const result = await reportToXlsx(report)
-    downloadReport(result, reportFilenamePrefix);
-    setLoading(false);
+      const result = await reportToXlsx(report)
+      downloadReport(result, reportFilenamePrefix);
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to generate the report: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
